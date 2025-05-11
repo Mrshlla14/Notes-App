@@ -1,91 +1,9 @@
- // Dummy data untuk catatan
-const dummyNotes = [
-    { id: 1, title: "Welcome to Notes, Dimas!", body: "Welcome to Notes! This is your first note. You can archive it, delete it, or create new ones.", date: "20022-07-28" },
-    { 
-        id: 2, 
-        title: "Meeting Agenda", 
-        body: "Discuss project updates and assign tasks for the upcoming week.", 
-        date: "2022-08-05" 
-      },
-      { 
-        id: 3, 
-        title: "Shopping List", 
-        body: "Milk, eggs, bread, fruits, and vegetables.", 
-        date: "2022-08-10" 
-      },
-      { 
-        id: 4, 
-        title: "Personal Goals", 
-        body: "Read two books per month, exercise three times a week, learn a new language.", 
-        date: "2022-08-15" 
-      },
-      { 
-        id: 5, 
-        title: "Recipe: Spaghetti Bolognese", 
-        body: "Ingredients: ground beef, tomatoes, onions, garlic, pasta. Steps:...", 
-        date: "2022-08-20" 
-      },
-      { 
-        id: 6, 
-        title: "Workout Routine", 
-        body: "Monday: Cardio, Tuesday: Upper body, Wednesday: Rest, Thursday: Lower body, Friday: Cardio.", 
-        date: "2022-08-25" 
-      },
-      {
-        id: 7,
-        title: 'Book Recommendations',
-        body: "1. 'The Alchemist' by Paulo Coelho, 2. '1984' by George Orwell, 3. 'To Kill a Mockingbird' by Harper Lee",
-        date: '2022-09-01',
-      },
-      {
-        id: 8,
-        title: 'Daily Reflections',
-        body: 'Write down three positive things that happened today and one thing to improve tomorrow.',
-        date: '2022-09-07',
-      },
-      {
-        id: 9,
-        title: 'Travel Bucket List',
-        body: '1. Paris-France, 2. Kyoto-Japan, 3. Santorini-Greece, 4. New York City-USA',
-        date: '2022-09-15',
-      },
-      {
-        id: 10,
-        title: 'Coding Projects',
-        body: '1. Build a personal website, 2. Create a mobile app, 3. Contribute to an open-source project',
-        date: '2022-09-20',
-      },
-      {
-        id: 11,
-        title: 'Project Deadline',
-        body: 'Complete project tasks by the deadline on October 1st.',
-        date: '2022-09-28',
-      },
-      {
-        id: 12,
-        title: 'Health Checkup',
-        body: 'Schedule a routine health checkup with the doctor.',
-        date: '2022-10-05',
-      },
-      {
-        id: 13,
-        title: 'Financial Goals',
-        body: '1. Create a monthly budget, 2. Save 20% of income, 3. Invest in a retirement fund.',
-        date: '2022-10-12',        
-      },
-      {
-        id: 14,
-        title: 'Holiday Plans',
-        body: 'Research and plan for the upcoming holiday destination.',
-        date: '2022-10-20',
-      },
-      {
-        id: 15,
-        title: 'Language Learning',
-        body: 'Practice Spanish vocabulary for 30 minutes every day.',
-        date: '2022-10-28',
-      },
-];
+async function fetchNotes() {
+  const response = await fetch("https://notes-api.dicoding.dev/v2/notes");
+  const data = await response.json();
+  console.log(data)
+  return data.data;
+}
 
 // Custom Element untuk App Header
 class AppHeader extends HTMLElement {
@@ -150,7 +68,9 @@ class NotesList extends HTMLElement {
     constructor() {
         super();
         this.attachShadow({ mode: 'open' });
-        this.notes = dummyNotes;
+        (async () => {
+        this.notes = await fetchNotes();
+        })();
     }
 
     static get observedAttributes() {
@@ -173,6 +93,7 @@ class NotesList extends HTMLElement {
     }
 
     render() {
+        console.log(this.notes)
         this.shadowRoot.innerHTML = `
             <style>
                 :host {
@@ -231,6 +152,7 @@ class NotesList extends HTMLElement {
                 </div>
             </div>
         `;
+
     }
 }
 
