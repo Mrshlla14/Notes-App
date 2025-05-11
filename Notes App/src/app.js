@@ -68,9 +68,7 @@ class NotesList extends HTMLElement {
     constructor() {
         super();
         this.attachShadow({ mode: 'open' });
-        (async () => {
-        this.notes = await fetchNotes();
-        })();
+        this.notes =[];
     }
 
     static get observedAttributes() {
@@ -84,8 +82,9 @@ class NotesList extends HTMLElement {
         }
     }
 
-    connectedCallback() {
-        this.render();
+    async connectedCallback() {
+  this.notes = await fetchNotes();
+  await this.render();
         document.addEventListener('note-added', (e) => {
             this.notes.unshift(e.detail);
             this.render();
@@ -233,19 +232,10 @@ class NoteCard extends HTMLElement {
             <div class="note-card">
                 <div class="note-title">${title}</div>
                 <div class="note-body">${body}</div>
-                <div class="note-date">${this.formatDate(date)}</div>
             </div>
         `;
     }
 
-    formatDate(dateStr) {
-        const date = new Date(dateStr);
-        return new Intl.DateTimeFormat('id-ID', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        }).format(date);
-    }
 }
 
 // Custom Element untuk Form Catatan
