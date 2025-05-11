@@ -68,8 +68,11 @@ class NotesList extends HTMLElement {
     constructor() {
         super();
         this.attachShadow({ mode: 'open' });
-        this.notes =[];
-    }
+        this.notes = [];
+        this.filteredNotes = [];
+        this.searchQuery = '';
+   }
+    
 
     static get observedAttributes() {
         return ['data-notes'];
@@ -83,16 +86,34 @@ class NotesList extends HTMLElement {
     }
 
     async connectedCallback() {
-  this.notes = await fetchNotes();
-  await this.render();
-        document.addEventListener('note-added', (e) => {
-            this.notes.unshift(e.detail);
-            this.render();
-        });
-    }
+    const allNotes = await fetchNotes();
+    this.notes = allNotes;
+    this.render();
 
-    render() {
-        console.log(this.notes)
+    document.addEventListener('note-added', (e) => {
+        this.notes.unshift(e.detail);
+        this.render();
+    });
+
+    document.addEventListener('note-deleted', (e) => {
+        this.notes = this.notes.filter(note => note.id !== e.detail);
+        this.render();
+    });
+
+    document.addEventListener('note-archived', (e) => {
+        this.notes = this.notes.map(note => note.id === e.detail ? { ...note, archived: true } : note);
+        this.render();
+    });
+
+    document.addEventListener('note-unarchived', (e) => {
+        this.notes = this.notes.map(note => note.id === e.detail ? { ...note, archived: false } : note);
+        this.render();
+    });
+}
+
+   render() {
+    const activeNotes = this.notes.filter(note => !note.archived);
+    const archivedNotes = this.notes.filter(note => note.archived);
         this.shadowRoot.innerHTML = `
             <style>
                 :host {
@@ -127,32 +148,64 @@ class NotesList extends HTMLElement {
                 }
                 
                 @media (max-width: 768px) {
-                    .notes-grid {
-                        grid-template-columns: 1fr;
+                .notes-grid {
+                    grid-template-columns: 1fr;
                     }
                 }
+                .search-input {
+                    margin-bottom: 20px;
+                    padding: 10px;
+                    width: 100%;
+                    font-size: 16px;
+                    border-radius: 8px;
+                    border: 1px solid #ccc;
+                }
             </style>
-            
+            <input type="text" placeholder="Cari catatan..." class="search-input" />
             <div class="notes-section">
-                <h2 class="section-title">Daftar Catatan</h2>
-                
-                <div class="notes-grid">
-                    ${this.notes.length > 0 ? 
-                        this.notes.map(note => `
-                            <note-card 
-                                data-id="${note.id}"
-                                data-title="${note.title}"
-                                data-body="${note.body}"
-                                data-date="${note.date}">
-                            </note-card>
-                        `).join('') : 
-                        `<div class="no-notes">Belum ada catatan. Silakan tambahkan catatan baru.</div>`
-                    }
-                </div>
+            <h2 class="section-title">Catatan Aktif</h2>
+             <div class="notes-grid">
+                ${activeNotes.length > 0 ?
+                    activeNotes.map(note => `
+                        <note-card 
+                            data-id="${note.id}"
+                            data-title="${note.title}"
+                            data-body="${note.body}"
+                            data-date="${note.createdAt}"
+                            data-archived="${note.archived}">
+                        </note-card>
+                    `).join('') :
+                    `<div class="no-notes">Tidak ada catatan aktif.</div>`
+                }
             </div>
-        `;
+        </div>
 
-    }
+         <div class="notes-section">
+            <h2 class="section-title">Catatan Diarsipkan</h2>
+            <div class="notes-grid">
+                ${archivedNotes.length > 0 ?
+                    archivedNotes.map(note => `
+                        <note-card 
+                            data-id="${note.id}"
+                            data-title="${note.title}"
+                            data-body="${note.body}"
+                            data-date="${note.createdAt}"
+                            data-archived="${note.archived}">
+                        </note-card>
+                    `).join('') :
+                    `<div class="no-notes">Tidak ada catatan diarsipkan.</div>`
+                }
+            </div>
+        </div>
+    `;
+    this.shadowRoot.querySelector('.search-input').addEventListener('input', (e) => {
+        this.searchQuery = e.target.value.toLowerCase();
+        this.filteredNotes = this.notes.filter(note =>
+            note.title.toLowerCase().includes(this.searchQuery)
+        );
+        this.render(); // render ulang dengan filter
+    });
+}
 }
 
 // Custom Element untuk Card Catatan
@@ -163,16 +216,60 @@ class NoteCard extends HTMLElement {
     }
 
     static get observedAttributes() {
-        return ['data-id', 'data-title', 'data-body', 'data-date'];
+        return ['data-id', 'data-title', 'data-body', 'data-date', 'data-archived'];
     }
+
 
     attributeChangedCallback(name, oldValue, newValue) {
         this.render();
     }
 
     connectedCallback() {
-        this.render();
-    }
+    this.render();
+    this.shadowRoot.querySelector('.delete-btn').addEventListener('click', () => {
+        const id = this.getAttribute('data-id');
+
+        fetch(`https://notes-api.dicoding.dev/v2/notes/${id}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.status === 'success') {
+                const deletedEvent = new CustomEvent("note-deleted", {
+                    detail: id,
+                    bubbles: true,
+                    composed: true
+                });
+                this.dispatchEvent(deletedEvent);
+            } else {
+                alert("Gagal menghapus catatan");
+            }
+        });
+    });
+    this.shadowRoot.querySelector('.archive-btn').addEventListener('click', () => {
+    const id = this.getAttribute('data-id');
+    const archived = this.getAttribute('data-archived') === 'true';
+
+    fetch(`https://notes-api.dicoding.dev/v2/notes/${id}/${archived ? 'unarchive' : 'archive'}`, {
+        method: 'POST'
+    })
+    .then(res => res.json())
+    .then(result => {
+        if (result.status === 'success') {
+            const eventName = archived ? 'note-unarchived' : 'note-archived';
+            const archiveEvent = new CustomEvent(eventName, {
+                detail: id,
+                bubbles: true,
+                composed: true
+            });
+            this.dispatchEvent(archiveEvent);
+        } else {
+            alert("Gagal mengarsipkan catatan");
+        }
+    });
+});
+
+}
 
     render() {
         const id = this.getAttribute('data-id');
@@ -227,11 +324,35 @@ class NoteCard extends HTMLElement {
                     margin-top: 15px;
                     text-align: right;
                 }
+                .delete-btn {
+                    margin-top: 15px;
+                    padding: 8px;
+                    font-size: 14px;
+                    background-color: #3498db;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                }
+                .archive-btn {
+                    margin-top: 10px;
+                    padding: 8px;
+                    font-size: 14px;
+                    background-color: #3498db;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                }
+
+
             </style>
             
             <div class="note-card">
                 <div class="note-title">${title}</div>
                 <div class="note-body">${body}</div>
+                <button class="delete-btn">Hapus</button>
+                <button class="archive-btn">${this.getAttribute('data-archived') === 'true' ? 'Kembalikan' : 'Arsipkan'}</button>
             </div>
         `;
     }
@@ -387,7 +508,36 @@ class NoteForm extends HTMLElement {
             e.preventDefault();
             
             let isValid = true;
-            
+            if (isValid) {
+    const newNote = {
+        title: titleInput.value.trim(),
+        body: bodyInput.value.trim(),
+    };
+
+    fetch("https://notes-api.dicoding.dev/v2/notes", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(newNote)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.status === "success") {
+            // Kirim event catatan ditambahkan ke komponen NotesList
+            const noteAddedEvent = new CustomEvent("note-added", {
+                detail: result.data,
+                bubbles: true,
+                composed: true
+            });
+            this.dispatchEvent(noteAddedEvent);
+            form.reset();
+        } else {
+            alert("Gagal menambahkan catatan.");
+        }
+    });
+}
+
             // Validasi judul
             if (titleInput.value.trim() === '') {
                 titleInput.classList.add('error');
